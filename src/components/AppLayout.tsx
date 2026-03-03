@@ -14,7 +14,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <SidebarTrigger />
               <div className="flex items-center gap-2">
                 <Shield className="h-5 w-5 text-primary" />
-                <span className="font-semibold text-foreground text-sm">SecureAudit AI</span>
+                <span className="font-semibold text-foreground text-sm">ReportX AI</span>
               </div>
             </div>
             <div className="flex items-center gap-3">

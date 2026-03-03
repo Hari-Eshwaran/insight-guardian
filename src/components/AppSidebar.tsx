@@ -46,7 +46,7 @@ export function AppSidebar() {
         <SidebarGroup>
           {!collapsed && (
             <SidebarGroupLabel className="text-primary font-bold text-xs tracking-widest uppercase mb-2">
-              SecureAudit AI
+              ReportX AI
             </SidebarGroupLabel>
           )}
           <SidebarGroupContent>
