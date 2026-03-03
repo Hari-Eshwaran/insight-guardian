@@ -1,2 +1,0 @@
-# Shodan Search for org-domain1.com
-Shodan API key not configured

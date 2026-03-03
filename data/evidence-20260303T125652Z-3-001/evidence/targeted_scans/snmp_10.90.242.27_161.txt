@@ -1,2 +1,0 @@
-Timeout: No Response from 10.90.242.27
-SNMP enumeration failed or community string not valid.
