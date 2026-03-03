@@ -7,6 +7,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { vulnerabilities, hosts, openServices, dataSourceFiles, dashboardStats, evidenceCategories } from "@/data/auditData";
+import { useBackend } from "@/services/BackendContext";
 import {
   CheckCircle, Loader2, Clock, Filter, Search, FileText,
   ArrowDownUp, Bug, Server, Globe, ChevronRight, Zap,
@@ -67,10 +68,29 @@ const transformStats = (() => {
 })();
 
 export default function ParsingETL() {
+  const { pipelineStatus } = useBackend();
   const [searchQuery, setSearchQuery] = useState("");
   const [severityFilter, setSeverityFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("findings");
+
+  // Derive pipeline steps from backend or use defaults
+  const pipelineSteps = pipelineStatus?.steps
+    ? Object.entries(pipelineStatus.steps).map(([name, step]) => ({
+        name,
+        status: step.status === "completed" ? "completed" : step.status === "in_progress" ? "processing" : "queued",
+        detail: step.detail || name,
+        time: step.duration_seconds != null ? `${step.duration_seconds.toFixed(1)}s` : "—",
+      }))
+    : [
+        { name: "File Extraction", status: "queued", detail: `${dashboardStats.totalEvidenceFiles + 6} files`, time: "—" },
+        { name: "CSV / TXT Parsing", status: "queued", detail: `${dashboardStats.totalDataSourceRows} rows`, time: "—" },
+        { name: "Risk Classification", status: "queued", detail: `${vulnerabilities.length} findings`, time: "—" },
+        { name: "Evidence Correlation", status: "queued", detail: "Pending", time: "—" },
+        { name: "Enrichment", status: "queued", detail: "Pending", time: "—" },
+      ];
+
+  const overallProgress = pipelineStatus?.overall_progress ?? 0;
 
   const categories = useMemo(() => [...new Set(vulnerabilities.map(v => v.category))].sort(), []);
 
@@ -178,9 +198,9 @@ export default function ParsingETL() {
           <div className="mt-3">
             <div className="flex justify-between text-xs text-muted-foreground mb-1">
               <span>Overall progress</span>
-              <span>75%</span>
+              <span>{overallProgress}%</span>
             </div>
-            <Progress value={75} className="h-2" />
+            <Progress value={overallProgress} className="h-2" />
           </div>
         </CardContent>
       </Card>

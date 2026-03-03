@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  aiModels, aiAnalysisOutput, dashboardStats, vulnerabilities,
+  dashboardStats, vulnerabilities,
   categoryBreakdown, hosts, severityDistribution
 } from "@/data/auditData";
 import {
@@ -21,6 +21,8 @@ import {
   GitBranch, FileSearch, Loader2, Info
 } from "lucide-react";
 import { useState, useRef } from "react";
+import { useBackend } from "@/services/BackendContext";
+import { useToast } from "@/hooks/use-toast";
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis,
@@ -73,36 +75,16 @@ const mitreMapping = (() => {
   }
 })();
 
-// Confidence scores per category
+// Confidence scores per category (deterministic, no Math.random())
 const confidenceScores = (() => {
   const cats = [...new Set(vulnerabilities.map(v => v.category))];
   return cats.map(cat => {
     const catVulns = vulnerabilities.filter(v => v.category === cat);
     const withCve = catVulns.filter(v => v.cve).length;
-    const confidence = Math.min(98, 60 + (withCve / Math.max(catVulns.length, 1)) * 30 + Math.random() * 8);
+    const confidence = Math.min(98, 60 + (withCve / Math.max(catVulns.length, 1)) * 38);
     return { category: cat, confidence: Math.round(confidence), findings: catVulns.length };
   });
 })();
-
-// Analysis timeline events
-const analysisTimeline = [
-  { time: "09:14:22", event: "Data ingestion complete", detail: `${dashboardStats.totalDataSourceRows} rows from 6 CSV files`, status: "done" },
-  { time: "09:14:25", event: "Evidence parsing started", detail: `Processing ${dashboardStats.totalEvidenceFiles} evidence files`, status: "done" },
-  { time: "09:15:01", event: "Vulnerability correlation", detail: `${vulnerabilities.length} findings mapped to ${hosts.length} hosts`, status: "done" },
-  { time: "09:15:12", event: "CVSS scoring engine", detail: "Scoring all findings against CVSS 3.1 framework", status: "done" },
-  { time: "09:15:30", event: "LLaMA 3 — Technical Analysis", detail: `Processing ${vulnerabilities.length} findings, generating attack paths`, status: "active" },
-  { time: "—", event: "Gemma 2 — Executive Summary", detail: "Awaiting LLaMA 3 completion", status: "pending" },
-  { time: "—", event: "Cross-validation pass", detail: "AI output vs. parsed evidence verification", status: "pending" },
-  { time: "—", event: "Report generation", detail: "Final PDF/HTML report compilation", status: "pending" },
-];
-
-// Token tracking
-const tokenUsage = {
-  inputTokens: Math.round(vulnerabilities.length * 340 + hosts.length * 120),
-  outputTokens: Math.round(vulnerabilities.length * 580),
-  contextWindow: 128000,
-  get utilization() { return Math.round(((this.inputTokens + this.outputTokens) / this.contextWindow) * 100); }
-};
 
 // Attack path chains
 const attackPaths = (() => {
@@ -142,20 +124,22 @@ const attackPaths = (() => {
       likelihood: "Medium"
     });
   }
-  paths.push({
-    name: "Missing Headers → XSS/Clickjacking",
-    steps: ["Identify servers without security headers", "Craft XSS or clickjacking payload", "Deliver via phishing email", "Capture session cookies"],
-    risk: "Medium",
-    likelihood: "High"
-  });
+  if (vulnerabilities.some(v => v.name.toLowerCase().includes("header") || v.name.toLowerCase().includes("clickjack"))) {
+    paths.push({
+      name: "Missing Headers → XSS/Clickjacking",
+      steps: ["Identify servers without security headers", "Craft XSS or clickjacking payload", "Deliver via phishing email", "Capture session cookies"],
+      risk: "Medium",
+      likelihood: "High"
+    });
+  }
 
   return paths;
 })();
 
-// Prompt templates
+// Prompt templates (dynamically computed from data)
 const promptTemplates = [
   { name: "Full Technical Analysis", prompt: `Analyze all ${vulnerabilities.length} vulnerability findings across ${hosts.length} hosts. Provide CVSS scoring, exploit likelihood, and attack path mapping.` },
-  { name: "Executive Summary", prompt: `Generate an executive-level summary of the PTE Sep-2025 assessment targeting non-technical stakeholders. Focus on business impact and risk.` },
+  { name: "Executive Summary", prompt: `Generate an executive-level summary of the security assessment targeting non-technical stakeholders. Focus on business impact and risk.` },
   { name: "Remediation Roadmap", prompt: `Create a prioritized remediation roadmap for all ${dashboardStats.criticalCount} critical and ${dashboardStats.highCount} high-severity findings with effort estimates.` },
   { name: "MITRE ATT&CK Mapping", prompt: `Map all identified vulnerabilities to MITRE ATT&CK framework tactics and techniques. Identify attack chains.` },
   { name: "Compliance Gap Analysis", prompt: `Assess findings against PCI-DSS, ISO 27001, and NIST CSF frameworks. Identify compliance gaps.` },
@@ -171,10 +155,67 @@ export default function AIAnalysis() {
   const [activeTab, setActiveTab] = useState("analysis");
   const [analysisRunning, setAnalysisRunning] = useState(false);
   const outputRef = useRef<HTMLDivElement>(null);
+  const { submitReport, generating, latestReport, health, analysisData, modelsData, pipelineStatus, refreshAnalysis } = useBackend();
+  const { toast } = useToast();
+  const [uploadedZip, setUploadedZip] = useState<File | null>(null);
 
-  const handleRunAnalysis = () => {
-    setAnalysisRunning(true);
-    setTimeout(() => setAnalysisRunning(false), 3000);
+  // Use backend timeline or empty
+  const analysisTimeline = analysisData?.timeline ?? [];
+
+  // Token usage from backend model_usage or compute from counts
+  const tokenUsage = (() => {
+    const mu = analysisData?.model_usage ?? [];
+    const inputTokens = mu.reduce((s, m) => s + m.input_tokens, 0);
+    const outputTokens = mu.reduce((s, m) => s + m.output_tokens, 0);
+    const contextWindow = 128000;
+    const utilization = contextWindow > 0 ? Math.round(((inputTokens + outputTokens) / contextWindow) * 100) : 0;
+    return { inputTokens, outputTokens, contextWindow, utilization };
+  })();
+
+  // AI analysis output from backend
+  const aiAnalysisOutput = analysisData?.technical_analysis || "No analysis output yet. Upload a ZIP file and run the pipeline to generate AI analysis.";
+
+  // Build model cards from backend data
+  const aiModels = (modelsData?.models ?? []).map(model => {
+    const usage = analysisData?.model_usage?.find(m => m.model === model.model_tag);
+    const status = usage?.status === "completed" ? "Completed" as const
+      : usage?.status === "processing" ? "Processing" as const
+      : usage?.status === "failed" ? "Failed" as const
+      : "Queued" as const;
+    const progress = status === "Completed" ? 100 : status === "Processing" ? 50 : 0;
+    return {
+      name: model.name,
+      purpose: model.purpose,
+      status,
+      progress,
+      description: usage?.status === "completed"
+        ? `Completed in ${usage.duration_seconds}s — ${usage.input_tokens} input, ${usage.output_tokens} output tokens`
+        : `${model.purpose} using ${model.model_tag}`,
+      parameters: model.parameters,
+      contextWindow: model.context_window,
+      quantization: model.quantization,
+    };
+  });
+
+  const handleRunAnalysis = async () => {
+    if (uploadedZip) {
+      try {
+        const report = await submitReport(uploadedZip, "general");
+        toast({ title: "Analysis complete", description: `${report.vulnerabilityCount} findings analyzed` });
+        setUploadedZip(null);
+        refreshAnalysis();
+      } catch {
+        toast({ title: "Analysis failed", description: "Check that Ollama is running", variant: "destructive" });
+      }
+    } else {
+      setAnalysisRunning(true);
+      setTimeout(() => setAnalysisRunning(false), 3000);
+    }
+  };
+
+  const handleZipSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file?.name.toLowerCase().endsWith(".zip")) setUploadedZip(file);
   };
 
   return (
@@ -191,8 +232,12 @@ export default function AIAnalysis() {
           <Badge variant="outline" className="border-success/40 text-success bg-success/10 text-xs gap-1.5 h-7">
             <Lock className="h-3 w-3" /> Air-Gapped
           </Badge>
-          <Badge variant="outline" className="border-primary/40 text-primary bg-primary/10 text-xs gap-1.5 h-7">
-            <Activity className="h-3 w-3" /> 2 Models
+          <Badge variant="outline" className={`text-xs gap-1.5 h-7 ${
+            health?.ollama_reachable
+              ? "border-success/40 text-success bg-success/10"
+              : "border-destructive/40 text-destructive bg-destructive/10"
+          }`}>
+            <Activity className="h-3 w-3" /> Ollama: {health?.ollama_reachable ? "Online" : "Offline"}
           </Badge>
         </div>
       </div>
@@ -267,19 +312,19 @@ export default function AIAnalysis() {
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded-md bg-muted/50 p-2">
                     <p className="text-muted-foreground">Parameters</p>
-                    <p className="font-medium">{model.name === "LLaMA 3" ? "8B" : "9B"}</p>
+                    <p className="font-medium">{model.parameters}</p>
                   </div>
                   <div className="rounded-md bg-muted/50 p-2">
                     <p className="text-muted-foreground">Context</p>
-                    <p className="font-medium">{model.name === "LLaMA 3" ? "128K" : "8K"}</p>
-                  </div>
-                  <div className="rounded-md bg-muted/50 p-2">
-                    <p className="text-muted-foreground">VRAM</p>
-                    <p className="font-medium">{model.name === "LLaMA 3" ? "6.2 GB" : "5.8 GB"}</p>
+                    <p className="font-medium">{model.contextWindow}</p>
                   </div>
                   <div className="rounded-md bg-muted/50 p-2">
                     <p className="text-muted-foreground">Quantization</p>
-                    <p className="font-medium">Q4_K_M</p>
+                    <p className="font-medium">{model.quantization}</p>
+                  </div>
+                  <div className="rounded-md bg-muted/50 p-2">
+                    <p className="text-muted-foreground">Status</p>
+                    <p className="font-medium">{model.status}</p>
                   </div>
                 </div>
               </CardContent>
@@ -395,14 +440,20 @@ export default function AIAnalysis() {
               placeholder="Enter analysis prompt... e.g., 'Analyze all critical SQL injection findings and map attack paths'"
               className="min-h-[80px] text-sm resize-none"
             />
-            <Button
-              className="self-end gap-1.5"
-              onClick={handleRunAnalysis}
-              disabled={analysisRunning || !customPrompt}
-            >
-              {analysisRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              {analysisRunning ? "Running" : "Analyze"}
-            </Button>
+            <div className="flex flex-col gap-2 self-end">
+              <input type="file" accept=".zip" className="hidden" id="ai-zip-upload" onChange={handleZipSelect} />
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => document.getElementById('ai-zip-upload')?.click()}>
+                <FileSearch className="h-3.5 w-3.5" /> {uploadedZip ? uploadedZip.name : "Upload ZIP"}
+              </Button>
+              <Button
+                className="self-end gap-1.5"
+                onClick={handleRunAnalysis}
+                disabled={(analysisRunning || generating) || (!customPrompt && !uploadedZip)}
+              >
+                {(analysisRunning || generating) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {(analysisRunning || generating) ? "Running" : "Analyze"}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -421,16 +472,28 @@ export default function AIAnalysis() {
         <TabsContent value="analysis" className="mt-4 space-y-4">
           <Card className="bg-card border-border">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-base">LLaMA 3 — Technical Risk Analysis Output</CardTitle>
+              <CardTitle className="text-base">
+                {latestReport ? "AI-Generated Report Output" : "LLaMA 3 — Technical Risk Analysis Output"}
+              </CardTitle>
               <div className="flex items-center gap-2">
-                <Badge className="bg-primary/15 text-primary border-primary/30 text-xs gap-1">
-                  <Loader2 className="h-3 w-3 animate-spin" /> Generating
-                </Badge>
+                {generating ? (
+                  <Badge className="bg-primary/15 text-primary border-primary/30 text-xs gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Generating
+                  </Badge>
+                ) : latestReport ? (
+                  <Badge className="bg-success/15 text-success border-success/30 text-xs gap-1">
+                    <CheckCircle className="h-3 w-3" /> {latestReport.vulnerabilityCount} Findings
+                  </Badge>
+                ) : (
+                  <Badge className="bg-primary/15 text-primary border-primary/30 text-xs gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Generating
+                  </Badge>
+                )}
               </div>
             </CardHeader>
             <CardContent>
               <div ref={outputRef} className="bg-muted/30 rounded-lg border border-border p-5 font-mono text-sm whitespace-pre-wrap leading-relaxed text-muted-foreground max-h-[600px] overflow-y-auto">
-                {aiAnalysisOutput}
+                {latestReport ? latestReport.markdown : aiAnalysisOutput}
               </div>
             </CardContent>
           </Card>
@@ -728,11 +791,22 @@ export default function AIAnalysis() {
                   <p className="text-[10px] text-muted-foreground mt-1">Output Tokens</p>
                 </div>
                 <div className="rounded-lg border border-border p-3 text-center">
-                  <p className="text-xl font-bold text-warning">~4.2s</p>
+                  <p className="text-xl font-bold text-warning">
+                    {analysisData?.model_usage?.length
+                      ? `${(analysisData.model_usage.reduce((s, m) => s + m.duration_seconds, 0) / analysisData.model_usage.length).toFixed(1)}s`
+                      : "—"}
+                  </p>
                   <p className="text-[10px] text-muted-foreground mt-1">Avg Latency/Query</p>
                 </div>
                 <div className="rounded-lg border border-border p-3 text-center">
-                  <p className="text-xl font-bold text-sky-400">23.6</p>
+                  <p className="text-xl font-bold text-sky-400">
+                    {(() => {
+                      const mu = analysisData?.model_usage ?? [];
+                      const totalTokens = mu.reduce((s, m) => s + m.output_tokens, 0);
+                      const totalTime = mu.reduce((s, m) => s + m.duration_seconds, 0);
+                      return totalTime > 0 ? (totalTokens / totalTime).toFixed(1) : "—";
+                    })()}
+                  </p>
                   <p className="text-[10px] text-muted-foreground mt-1">Tokens/sec</p>
                 </div>
               </div>

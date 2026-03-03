@@ -81,7 +81,7 @@ export default function Alerts() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Alerts & Recommendations</h1>
-          <p className="text-muted-foreground text-sm mt-1">Critical findings and prioritized remediation guidance from PTE Sep-2025</p>
+          <p className="text-muted-foreground text-sm mt-1">Critical findings and prioritized remediation guidance</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8">

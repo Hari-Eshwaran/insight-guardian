@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { whiteningExamples, hosts, vulnerabilities, dashboardStats } from "@/data/auditData";
+import { useBackend } from "@/services/BackendContext";
 import {
   ArrowRight, Info, Shield, Eye, EyeOff, Lock, CheckCircle,
   AlertTriangle, Fingerprint, Globe, Server, FileText, Zap,
@@ -25,8 +26,8 @@ const chartTooltipStyle = {
   itemStyle: { color: "hsl(210, 20%, 90%)" },
 };
 
-// Sanitization rules with counts
-const sanitizationRules = [
+// Default sanitization rules (used before pipeline runs)
+const defaultSanitizationRules = [
   {
     id: "ip",
     label: "IP Address Masking",
@@ -90,6 +91,30 @@ const sanitizationRules = [
 ];
 
 export default function DataWhitening() {
+  const { whiteningData } = useBackend();
+
+  // Use backend sanitization rules if available, otherwise use defaults
+  const sanitizationRules = (whiteningData?.sanitization_rules ?? []).length > 0
+    ? whiteningData!.sanitization_rules.map(r => {
+        const iconMap: Record<string, typeof Server> = { ip: Server, domain: Globe, email: Fingerprint, url: Globe, mac: Lock, cert_uuid: Lock };
+        const catMap: Record<string, string> = { ip: "network", domain: "network", email: "identity", url: "network", mac: "identity", cert_uuid: "identity" };
+        return {
+          id: r.rule_id,
+          label: r.label,
+          description: r.description,
+          icon: iconMap[r.rule_id] || Shield,
+          count: r.matches,
+          pattern: r.pattern,
+          replacement: r.replacement,
+          category: catMap[r.rule_id] || "system",
+        };
+      })
+    : defaultSanitizationRules;
+
+  // Use backend examples if available, merge with auditData
+  const displayExamples = (whiteningData?.examples ?? []).length > 0
+    ? whiteningData!.examples.map(e => ({ field: e.field, original: e.original, whitened: e.whitened }))
+    : whiteningExamples;
   const [rules, setRules] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(sanitizationRules.map(r => [r.id, true]))
   );
@@ -250,7 +275,7 @@ export default function DataWhitening() {
         {/* Before/After Tab */}
         <TabsContent value="preview" className="mt-4 space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {whiteningExamples.map((ex) => (
+            {displayExamples.map((ex) => (
               <Card key={ex.field} className="bg-card border-border">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">

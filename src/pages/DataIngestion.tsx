@@ -16,6 +16,7 @@ import {
   RefreshCw, Trash2, Settings, CheckCircle2, XCircle, Loader2, ArrowRight
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useBackend } from "@/services/BackendContext";
 
 // ─── Integration source definitions ────────────────────────────────
 
@@ -37,7 +38,7 @@ const defaultSources: IntegrationSource[] = [
     type: "file",
     provider: "File System",
     status: "connected",
-    lastSync: "2025-09-08 16:30 IDT",
+    lastSync: new Date().toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" }),
     records: totalEvidenceFiles,
     enabled: true,
   },
@@ -47,7 +48,7 @@ const defaultSources: IntegrationSource[] = [
     type: "file",
     provider: "Metasploit",
     status: "connected",
-    lastSync: "2025-09-08 12:30 UTC",
+    lastSync: new Date().toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" }),
     records: dataSourceFiles.reduce((s, f) => s + f.rows, 0),
     enabled: true,
   },
@@ -183,6 +184,42 @@ export default function DataIngestion() {
   const [sources, setSources] = useState<IntegrationSource[]>(defaultSources);
   const [activeTab, setActiveTab] = useState("all");
   const { toast } = useToast();
+  const { submitReport, generating, generateError, health } = useBackend();
+  const fileInputRef = useState<HTMLInputElement | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [orgContext, setOrgContext] = useState("general");
+
+  const handleFileDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.toLowerCase().endsWith(".zip")) {
+      setUploadedFile(file);
+      toast({ title: "File ready", description: `${file.name} (${(file.size / 1024).toFixed(1)} KB) — click 'Generate Report' to process` });
+    } else {
+      toast({ title: "Invalid file", description: "Please upload a .zip file", variant: "destructive" });
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.name.toLowerCase().endsWith(".zip")) {
+      setUploadedFile(file);
+      toast({ title: "File ready", description: `${file.name} selected` });
+    }
+  };
+
+  const handleGenerateReport = async () => {
+    if (!uploadedFile) return;
+    try {
+      const report = await submitReport(uploadedFile, orgContext);
+      toast({ title: "Report generated!", description: `${report.vulnerabilityCount} High/Critical findings found. Check the Reports page.` });
+      setUploadedFile(null);
+    } catch {
+      toast({ title: "Generation failed", description: generateError || "Unknown error", variant: "destructive" });
+    }
+  };
 
   const toggleSource = (id: string) => {
     setSources((prev) =>
@@ -612,23 +649,90 @@ export default function DataIngestion() {
       </Card>
 
       {/* File Upload */}
-      <Card className="bg-card border-border border-dashed">
+      <Card
+        className={`bg-card border-dashed transition-colors ${
+          dragOver ? "border-primary bg-primary/5" : uploadedFile ? "border-success/50 bg-success/5" : "border-border"
+        }`}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleFileDrop}
+      >
         <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
-          <div className="rounded-full p-4 bg-primary/10">
-            <Upload className="h-8 w-8 text-primary" />
+          <div className={`rounded-full p-4 ${uploadedFile ? "bg-success/10" : "bg-primary/10"}`}>
+            {generating ? (
+              <Loader2 className="h-8 w-8 text-primary animate-spin" />
+            ) : uploadedFile ? (
+              <CheckCircle className="h-8 w-8 text-success" />
+            ) : (
+              <Upload className="h-8 w-8 text-primary" />
+            )}
           </div>
           <div className="text-center">
-            <p className="font-medium">Drag & Drop Evidence Files</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Supports Metasploit CSV exports, Nmap XML/TXT, Nikto reports, Nessus .nessus, Qualys XML
-            </p>
+            {uploadedFile ? (
+              <>
+                <p className="font-medium text-success">{uploadedFile.name}</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {(uploadedFile.size / 1024).toFixed(1)} KB — Ready to process
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-medium">Drag & Drop a Scan ZIP File</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Upload a ZIP containing XML/JSON/CSV scan outputs for AI analysis
+                </p>
+              </>
+            )}
           </div>
-          <div className="flex gap-2 mt-2">
-            <Badge variant="outline" className="gap-1"><FileCode className="h-3 w-3" /> CSV</Badge>
-            <Badge variant="outline" className="gap-1"><FileJson className="h-3 w-3" /> TXT</Badge>
-            <Badge variant="outline" className="gap-1"><FileCode className="h-3 w-3" /> XML</Badge>
-            <Badge variant="outline" className="gap-1"><FileJson className="h-3 w-3" /> JSON</Badge>
-            <Badge variant="outline" className="gap-1"><FileCode className="h-3 w-3" /> .nessus</Badge>
+          <div className="flex flex-col items-center gap-3 mt-2">
+            <div className="flex gap-2">
+              <Badge variant="outline" className="gap-1"><FileCode className="h-3 w-3" /> CSV</Badge>
+              <Badge variant="outline" className="gap-1"><FileJson className="h-3 w-3" /> TXT</Badge>
+              <Badge variant="outline" className="gap-1"><FileCode className="h-3 w-3" /> XML</Badge>
+              <Badge variant="outline" className="gap-1"><FileJson className="h-3 w-3" /> JSON</Badge>
+              <Badge variant="outline" className="gap-1"><FileCode className="h-3 w-3" /> .nessus</Badge>
+            </div>
+            <div className="flex items-center gap-3">
+              <input
+                type="file"
+                accept=".zip"
+                className="hidden"
+                id="zip-upload"
+                onChange={handleFileSelect}
+              />
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => document.getElementById('zip-upload')?.click()}>
+                <Upload className="h-3.5 w-3.5" /> Browse Files
+              </Button>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="org-ctx-upload" className="text-xs text-muted-foreground">Context:</Label>
+                <Select value={orgContext} onValueChange={setOrgContext}>
+                  <SelectTrigger className="h-8 w-32 text-xs" id="org-ctx-upload">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    <SelectItem value="banking">Banking</SelectItem>
+                    <SelectItem value="healthcare">Healthcare</SelectItem>
+                    <SelectItem value="government">Government</SelectItem>
+                    <SelectItem value="technology">Technology</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {uploadedFile && (
+                <Button
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={handleGenerateReport}
+                  disabled={generating || !(health?.ollama_reachable)}
+                >
+                  {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                  {generating ? "Processing..." : "Generate Report"}
+                </Button>
+              )}
+            </div>
+            {!health?.ollama_reachable && uploadedFile && (
+              <p className="text-xs text-warning">Ollama is not reachable. Start it to generate reports.</p>
+            )}
           </div>
         </CardContent>
       </Card>

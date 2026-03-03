@@ -4,7 +4,8 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { validationChecklist, vulnerabilities, dashboardStats, hosts } from "@/data/auditData";
+import { vulnerabilities, dashboardStats, hosts } from "@/data/auditData";
+import { useBackend } from "@/services/BackendContext";
 import {
   CheckCircle, XCircle, ShieldCheck, Info, AlertTriangle,
   BarChart3, FileSearch, Zap, Bug, Target, Shield, Eye,
@@ -62,6 +63,20 @@ const categoryValidation = (() => {
 })();
 
 export default function Validation() {
+  const { validationData, refreshValidation } = useBackend();
+
+  // Use backend checklist or fallback defaults
+  const validationChecklist = validationData?.checklist ?? [
+    { label: "All findings have evidence references", passed: false },
+    { label: "Severity ratings match CVSS scores", passed: false },
+    { label: "No hallucinated CVEs in output", passed: false },
+    { label: "All hosts in report exist in scan data", passed: false },
+    { label: "Remediation suggestions are actionable", passed: false },
+    { label: "Executive summary matches technical findings", passed: false },
+    { label: "MITRE ATT&CK mappings are valid", passed: false },
+    { label: "No PII/client data in AI output", passed: false },
+  ];
+
   const passedCount = validationChecklist.filter((c) => c.passed).length;
   const total = validationChecklist.length;
   const overallAccuracy = Math.round((passedCount / total) * 100);

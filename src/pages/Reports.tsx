@@ -3,9 +3,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { reports, vulnerabilities, severityDistribution, categoryBreakdown, dashboardStats } from "@/data/auditData";
-import { Download, Eye, FileText } from "lucide-react";
+import { vulnerabilities, severityDistribution, categoryBreakdown, dashboardStats } from "@/data/auditData";
+import { Download, Eye, FileText, Brain } from "lucide-react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { useState } from "react";
+import { useBackend } from "@/services/BackendContext";
 
 const chartTooltipStyle = {
   contentStyle: { backgroundColor: "hsl(220, 18%, 12%)", border: "1px solid hsl(220, 14%, 20%)", borderRadius: "8px", fontSize: "12px", color: "hsl(210, 20%, 90%)" },
@@ -23,6 +25,19 @@ const severityBadge = (severity: string) => {
 };
 
 export default function Reports() {
+  const { generatedReports, reportsList, analysisData } = useBackend();
+  const [previewReport, setPreviewReport] = useState<string | null>(null);
+
+  const downloadMarkdown = (name: string, markdown: string) => {
+    const blob = new Blob([markdown], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${name}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -76,31 +91,78 @@ export default function Reports() {
                 <TableHead>Report Name</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Findings</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {reports.map((r) => (
-                <TableRow key={r.name}>
+              {/* Backend-generated reports */}
+              {generatedReports.map((r) => (
+                <TableRow key={r.id} className="border-primary/10 bg-primary/5">
+                  <TableCell className="font-medium flex items-center gap-2">
+                    <Brain className="h-4 w-4 text-primary" />{r.name}
+                    <Badge className="bg-primary/15 text-primary border-primary/30 text-[10px]">AI Generated</Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{r.date}</TableCell>
+                  <TableCell>
+                    <Badge className="bg-success/15 text-success border-success/30">Completed</Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{r.vulnerabilityCount}</TableCell>
+                  <TableCell className="text-right space-x-2">
+                    <Button variant="ghost" size="sm" onClick={() => downloadMarkdown(r.name, r.markdown)}>
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setPreviewReport(previewReport === r.id ? null : r.id)}>
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {/* Backend report list (from /reports endpoint) */}
+              {reportsList.filter(rl => !generatedReports.some(gr => gr.id === rl.id)).map((r) => (
+                <TableRow key={r.id}>
                   <TableCell className="font-medium flex items-center gap-2">
                     <FileText className="h-4 w-4 text-muted-foreground" />{r.name}
                   </TableCell>
                   <TableCell className="text-muted-foreground">{r.date}</TableCell>
                   <TableCell>
-                    <Badge className={r.status === "Completed" ? "bg-success/15 text-success border-success/30" : "bg-primary/15 text-primary border-primary/30"}>
-                      {r.status}
-                    </Badge>
+                    <Badge className="bg-success/15 text-success border-success/30">Completed</Badge>
                   </TableCell>
+                  <TableCell className="text-muted-foreground">{r.vulnerability_count ?? "—"}</TableCell>
                   <TableCell className="text-right space-x-2">
                     <Button variant="ghost" size="sm"><Download className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="sm"><Eye className="h-4 w-4" /></Button>
                   </TableCell>
                 </TableRow>
               ))}
+              {generatedReports.length === 0 && reportsList.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    No reports generated yet. Upload a ZIP file from Data Ingestion to generate an AI report.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      {/* Live Report Preview */}
+      {previewReport && generatedReports.find(r => r.id === previewReport) && (
+        <Card className="bg-card border-primary/30">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Brain className="h-5 w-5 text-primary" />
+              AI Report Preview: {generatedReports.find(r => r.id === previewReport)!.name}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="bg-muted/30 rounded-lg border border-border p-5 font-mono text-sm whitespace-pre-wrap leading-relaxed text-muted-foreground max-h-[600px] overflow-y-auto">
+              {generatedReports.find(r => r.id === previewReport)!.markdown}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="bg-card border-border">
         <CardHeader><CardTitle className="text-lg">Report Preview</CardTitle></CardHeader>
@@ -113,8 +175,14 @@ export default function Reports() {
             </TabsList>
             <TabsContent value="summary" className="mt-4">
               <div className="bg-muted/50 rounded-md p-4 text-sm text-muted-foreground leading-relaxed space-y-3">
-                <p>The PTE Sep-2025 assessment of <strong className="text-foreground">{dashboardStats.totalHosts} hosts</strong> across Azure and on-premises environments identified <strong className="text-foreground">{dashboardStats.criticalCount} critical</strong> and <strong className="text-foreground">{dashboardStats.highCount} high-severity</strong> vulnerabilities. The most pressing concerns involve SQL injection on production web servers, unauthenticated JBoss JMX consoles, and severely outdated FTP servers (FileZilla 0.9.60 beta).</p>
-                <p>Three hosts running end-of-life Windows Server 2008 present ongoing zero-day exposure. All 12 web-facing servers lack essential security headers. Immediate remediation is recommended for all critical findings, with a phased approach for high and medium-severity items.</p>
+                {analysisData?.executive_summary ? (
+                  <p>{analysisData.executive_summary}</p>
+                ) : (
+                  <>
+                    <p>The security assessment of <strong className="text-foreground">{dashboardStats.totalHosts} hosts</strong> across Azure and on-premises environments identified <strong className="text-foreground">{dashboardStats.criticalCount} critical</strong> and <strong className="text-foreground">{dashboardStats.highCount} high-severity</strong> vulnerabilities.</p>
+                    <p className="text-muted-foreground/60 italic">Run the AI pipeline from Data Ingestion to generate a full executive summary.</p>
+                  </>
+                )}
               </div>
             </TabsContent>
             <TabsContent value="scoring" className="mt-4">

@@ -8,9 +8,13 @@ import {
   FileText,
   AlertTriangle,
   WifiOff,
+  Wifi,
+  Loader2,
+  Server,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
+import { useBackend } from "@/services/BackendContext";
 import {
   Sidebar,
   SidebarContent,
@@ -39,6 +43,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const { health, healthLoading, healthError } = useBackend();
 
   return (
     <Sidebar collapsible="icon">
@@ -72,9 +77,29 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
         {!collapsed && (
-          <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
-            <WifiOff className="h-3.5 w-3.5 text-success" />
-            <span>Offline Mode Active</span>
+          <div className="space-y-1.5 px-3 py-2">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              {healthLoading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : healthError ? (
+                <WifiOff className="h-3.5 w-3.5 text-destructive" />
+              ) : (
+                <Server className="h-3.5 w-3.5 text-success" />
+              )}
+              <span>Backend: {healthLoading ? "..." : healthError ? "Offline" : "Online"}</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              {health?.ollama_reachable ? (
+                <Wifi className="h-3.5 w-3.5 text-success" />
+              ) : (
+                <WifiOff className="h-3.5 w-3.5 text-warning" />
+              )}
+              <span>Ollama: {health?.ollama_reachable ? "Online" : "Offline"}</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <WifiOff className="h-3.5 w-3.5 text-success" />
+              <span>Offline Mode Active</span>
+            </div>
           </div>
         )}
       </SidebarFooter>

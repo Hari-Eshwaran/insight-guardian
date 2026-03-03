@@ -329,17 +329,9 @@ export const dataSourceFiles = [
 ];
 
 // ═══════════════════════════════════════════════════════════════════
-// WORKFLOW STATUS
+// WORKFLOW STATUS — now sourced from backend pipeline state
 // ═══════════════════════════════════════════════════════════════════
-
-export const workflowSteps = [
-  { name: "Ingestion", status: "completed" as const },
-  { name: "Parsing & ETL", status: "completed" as const },
-  { name: "Data Whitening", status: "completed" as const },
-  { name: "AI Analysis", status: "processing" as const },
-  { name: "Validation", status: "pending" as const },
-  { name: "Report", status: "pending" as const },
-];
+// workflowSteps removed — use useBackend().pipelineStatus.steps instead
 
 // ═══════════════════════════════════════════════════════════════════
 // COMPUTED STATS — all derived dynamically from parsed data
@@ -510,96 +502,28 @@ export const whiteningExamples = (() => {
     examples.push({ field: "Internal IP Leak", original: ipLeak[1], whitened: "INTERNAL_BACKEND_01" });
   }
 
-  // Registrar info (derived from data patterns)
-  examples.push({ field: "Registrar Info", original: "DomainTheNet.com", whitened: "REGISTRAR_01" });
-
-  return examples;
+    return examples;
 })();
 
 // ═══════════════════════════════════════════════════════════════════
 // AI MODELS — dynamic description from parsed data counts
 // ═══════════════════════════════════════════════════════════════════
 
-export const aiModels = [
-  {
-    name: "LLaMA 3",
-    purpose: "Technical Risk Analysis",
-    status: "Processing" as const,
-    progress: 68,
-    description: `Analyzing ${vulnerabilities.length} real vulnerability findings from Nmap, Nikto, and manual scan evidence across ${hosts.length} hosts. Performing CVSS scoring, exploit likelihood assessment, and attack path mapping.`,
-  },
-  {
-    name: "Gemma 2",
-    purpose: "Executive Summary & Remediation",
-    status: "Queued" as const,
-    progress: 0,
-    description:
-      "Will generate executive-level summary with business impact analysis, prioritized remediation roadmap, and compliance gap assessment based on LLaMA 3 output.",
-  },
-];
+// aiModels removed — use useBackend().modelsData and pipelineStatus instead
 
-export const aiAnalysisOutput = `## Technical Risk Analysis — org-domainh PTE Sep-2025
-
-### Summary
-- **${hosts.length}** hosts assessed (${dashboardStats.azureHosts} Azure, ${dashboardStats.onPremHosts} On-Prem)
-- **${vulnerabilities.length}** vulnerabilities identified
-- **${dashboardStats.criticalCount}** Critical, **${dashboardStats.highCount}** High, **${dashboardStats.mediumCount}** Medium, **${dashboardStats.lowCount}** Low
-
-${vulnerabilities
-  .filter((v) => v.severity === "Critical")
-  .map(
-    (v, i) => `### Critical Finding #${i + 1}: ${v.name}
-
-${v.description}
-
-- **Host**: ${v.host}:${v.port}
-- **Evidence**: ${v.evidence}
-${v.cve ? `- **CVE/CWE**: ${v.cve}` : ""}
-`
-  )
-  .join("\n")}
-### High Risk Findings
-
-${vulnerabilities
-  .filter((v) => v.severity === "High")
-  .map((v) => `- **${v.name}** — ${v.host} (${v.category})`)
-  .join("\n")}
-
-### Systemic: Missing Security Headers
-
-All web-facing hosts lack critical security headers including X-Frame-Options, X-Content-Type-Options, HSTS, CSP, and X-XSS-Protection.
-
-**Recommendation**: Implement a centralized security header policy at the reverse proxy/load balancer level.`;
+// aiAnalysisOutput removed — use useBackend().analysisData.technical_analysis instead
 
 // ═══════════════════════════════════════════════════════════════════
 // VALIDATION — checks derived from parsed data integrity
 // ═══════════════════════════════════════════════════════════════════
 
-export const validationChecklist = [
-  {
-    label: "All vulnerability findings traced to evidence files",
-    passed: vulnerabilities.every((v) => v.evidence.length > 0),
-  },
-  { label: "CVE references verified against NVD database", passed: true },
-  { label: "Severity ratings aligned with CVSS 3.1 scoring", passed: true },
-  { label: "No external data references in AI output", passed: true },
-  { label: "Host IPs match Metasploit export records", passed: true },
-  { label: "Remediation steps validated against vendor advisories", passed: true },
-  { label: "Executive summary accuracy cross-check", passed: false },
-  { label: "Business impact assessment completeness", passed: false },
-];
+// validationChecklist removed — use useBackend().validationData.checklist instead
 
 // ═══════════════════════════════════════════════════════════════════
 // REPORTS
 // ═══════════════════════════════════════════════════════════════════
 
-export const reports = [
-  { name: "PTE Sep-2025 — Full Technical Report", date: "2025-09-15", status: "In Progress" as const },
-  { name: "Critical Vulnerabilities Executive Brief", date: "2025-09-14", status: "In Progress" as const },
-  { name: "Azure Infrastructure Assessment", date: "2025-09-13", status: "Completed" as const },
-  { name: "On-Premises Security Posture", date: "2025-09-12", status: "Completed" as const },
-  { name: "Remediation Priority Matrix", date: "2025-09-11", status: "Completed" as const },
-];
+// reports removed — use useBackend().reportsList instead
 
 // ═══════════════════════════════════════════════════════════════════
 // ALERTS — dynamically generated from parsed critical/high vulns
@@ -622,7 +546,7 @@ export const alerts = (() => {
         v.description.length > 200 ? "..." : ""
       }`,
       severity: v.severity.toLowerCase() as "critical" | "high",
-      time: "Detected Sep 8, 2025",
+      time: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
     });
   }
 

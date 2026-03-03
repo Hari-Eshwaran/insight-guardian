@@ -1,9 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import {
-  dashboardStats, workflowSteps, severityDistribution,
+  dashboardStats, severityDistribution,
   categoryBreakdown, osDistribution, serviceDistribution,
   hostRiskScores, scanActivityHeatmap, evidenceCategories,
   hosts, openServices
@@ -11,8 +12,9 @@ import {
 import {
   Server, AlertTriangle, ShieldAlert, FileSearch, Brain, WifiOff,
   CheckCircle, Clock, Loader2, Monitor, Cloud, HardDrive,
-  Activity, Globe, Shield
+  Activity, Globe, Shield, Wifi, RefreshCw
 } from "lucide-react";
+import { useBackend } from "@/services/BackendContext";
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -69,6 +71,20 @@ const flatTreeData = [
 ];
 
 export default function Dashboard() {
+  const { health, healthLoading, healthError, refreshHealth, generatedReports, pipelineStatus, modelsData } = useBackend();
+
+  const workflowSteps = pipelineStatus?.steps.map(s => ({
+    name: s.name,
+    status: s.status as "pending" | "processing" | "completed" | "failed",
+  })) ?? [
+    { name: "Ingestion", status: "pending" as const },
+    { name: "Parsing & ETL", status: "pending" as const },
+    { name: "Data Whitening", status: "pending" as const },
+    { name: "AI Analysis", status: "pending" as const },
+    { name: "Validation", status: "pending" as const },
+    { name: "Report", status: "pending" as const },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -76,14 +92,69 @@ export default function Dashboard() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Security Audit Dashboard</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            org-domainh PTE Sep-2025 — {dashboardStats.totalHosts} hosts assessed across Azure & On-Premises
+            {pipelineStatus?.organization_context
+              ? `${pipelineStatus.organization_context.charAt(0).toUpperCase() + pipelineStatus.organization_context.slice(1)} Assessment`
+              : "Security Audit"} — {dashboardStats.totalHosts} hosts assessed across Azure & On-Premises
           </p>
         </div>
-        <Badge variant="outline" className="border-primary/40 text-primary bg-primary/10 text-xs gap-1.5 h-7">
-          <Activity className="h-3 w-3" />
-          Live Analysis
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="border-primary/40 text-primary bg-primary/10 text-xs gap-1.5 h-7">
+            <Activity className="h-3 w-3" />
+            Live Analysis
+          </Badge>
+        </div>
       </div>
+
+      {/* Backend Status Banner */}
+      <Card className="bg-card border-border">
+        <CardContent className="flex items-center justify-between py-3">
+          <div className="flex items-center gap-4">
+            <div className={`rounded-full p-2 ${
+              healthError ? "bg-destructive/10" : health ? "bg-success/10" : "bg-muted"
+            }`}>
+              {healthLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : healthError ? (
+                <WifiOff className="h-4 w-4 text-destructive" />
+              ) : (
+                <Wifi className="h-4 w-4 text-success" />
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-medium">
+                Backend: {healthLoading ? "Checking..." : healthError ? "Offline" : "Connected"}
+              </p>
+              <div className="flex items-center gap-3 mt-0.5">
+                {health && (
+                  <>
+                    <Badge className={health.ollama_reachable
+                      ? "bg-success/15 text-success border-success/30 text-[10px]"
+                      : "bg-warning/15 text-warning border-warning/30 text-[10px]"
+                    }>
+                      Ollama: {health.ollama_reachable ? "Online" : "Offline"}
+                    </Badge>
+                    <Badge className="bg-primary/15 text-primary border-primary/30 text-[10px]">
+                      Mode: {health.offline ? "Air-Gapped" : "Online"}
+                    </Badge>
+                    {generatedReports.length > 0 && (
+                      <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px]">
+                        {generatedReports.length} Report{generatedReports.length !== 1 ? "s" : ""} Generated
+                      </Badge>
+                    )}
+                  </>
+                )}
+                {healthError && (
+                  <span className="text-xs text-destructive">{healthError}</span>
+                )}
+              </div>
+            </div>
+          </div>
+          <Button variant="ghost" size="sm" onClick={refreshHealth} disabled={healthLoading} className="gap-1.5 text-xs">
+            <RefreshCw className={`h-3.5 w-3.5 ${healthLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Top Stats Row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -363,7 +434,7 @@ export default function Dashboard() {
 
       {/* Scan Activity Heatmap */}
       <Card className="bg-card border-border">
-        <CardHeader><CardTitle className="text-lg">Scan Activity Heatmap (Sep 8, 2025)</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-lg">Scan Activity Heatmap</CardTitle></CardHeader>
         <CardContent>
           <ScanHeatmap />
         </CardContent>
@@ -398,15 +469,24 @@ export default function Dashboard() {
               <Brain className="h-5 w-5 text-primary" />
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">LLaMA 3 — Technical Analysis</span>
-                <Badge className="bg-primary/15 text-primary border-primary/30">Processing</Badge>
-              </div>
-              <Progress value={68} className="h-1.5" />
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Gemma 2 — Executive Summary</span>
-                <Badge className="bg-muted text-muted-foreground border-border">Queued</Badge>
-              </div>
+              {modelsData?.models.map((model) => {
+                const usage = pipelineStatus ? (pipelineStatus.steps.find(s => s.name === "AI Analysis")) : null;
+                const modelStatus = usage?.status === "completed" ? "Completed" : usage?.status === "processing" ? "Processing" : "Pending";
+                const progress = usage?.status === "completed" ? 100 : usage?.status === "processing" ? 50 : 0;
+                return (
+                  <div key={model.name}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">{model.name} — {model.purpose}</span>
+                      <Badge className={modelStatus === "Completed" ? "bg-success/15 text-success border-success/30" : modelStatus === "Processing" ? "bg-primary/15 text-primary border-primary/30" : "bg-muted text-muted-foreground border-border"}>
+                        {modelStatus}
+                      </Badge>
+                    </div>
+                    {modelStatus === "Processing" && <Progress value={progress} className="h-1.5 mt-1" />}
+                  </div>
+                );
+              }) ?? (
+                <p className="text-sm text-muted-foreground">No model info available</p>
+              )}
             </CardContent>
           </Card>
 
@@ -418,15 +498,21 @@ export default function Dashboard() {
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Network Mode</span>
-                <Badge variant="outline" className="border-success/40 text-success">Air-Gapped</Badge>
+                <Badge variant="outline" className={health?.offline ? "border-success/40 text-success" : "border-warning/40 text-warning"}>
+                  {health?.offline ? "Air-Gapped" : "Online"}
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Data Privacy</span>
-                <Badge variant="outline" className="border-success/40 text-success">Enforced</Badge>
+                <span className="text-sm text-muted-foreground">Ollama</span>
+                <Badge variant="outline" className={health?.ollama_reachable ? "border-success/40 text-success" : "border-destructive/40 text-destructive"}>
+                  {health?.ollama_reachable ? "Connected" : "Unreachable"}
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Encryption</span>
-                <Badge variant="outline" className="border-success/40 text-success">AES-256</Badge>
+                <span className="text-sm text-muted-foreground">Backend</span>
+                <Badge variant="outline" className={health ? "border-success/40 text-success" : "border-destructive/40 text-destructive"}>
+                  {health ? "Connected" : "Offline"}
+                </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Data Sources</span>
