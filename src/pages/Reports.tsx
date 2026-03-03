@@ -3,8 +3,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { reports, vulnerabilities } from "@/data/mockData";
+import { reports, vulnerabilities, severityDistribution, categoryBreakdown } from "@/data/mockData";
 import { Download, Eye, FileText } from "lucide-react";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+
+const chartTooltipStyle = {
+  contentStyle: { backgroundColor: "hsl(220, 18%, 12%)", border: "1px solid hsl(220, 14%, 20%)", borderRadius: "8px", fontSize: "12px", color: "hsl(210, 20%, 90%)" },
+  itemStyle: { color: "hsl(210, 20%, 90%)" },
+};
 
 export default function Reports() {
   return (
@@ -12,6 +18,42 @@ export default function Reports() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Reports & Dashboard</h1>
         <p className="text-muted-foreground text-sm mt-1">Generated audit reports and detailed findings</p>
+      </div>
+
+      {/* Report Charts */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="bg-card border-border">
+          <CardHeader><CardTitle className="text-base">Findings by Severity</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie data={severityDistribution} cx="50%" cy="50%" innerRadius={50} outerRadius={85} dataKey="value" stroke="none" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                  {severityDistribution.map((entry, i) => (
+                    <Cell key={i} fill={entry.fill} />
+                  ))}
+                </Pie>
+                <Tooltip {...chartTooltipStyle} />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border">
+          <CardHeader><CardTitle className="text-base">Risk Scores by Category</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={categoryBreakdown} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 14%, 20%)" horizontal={false} />
+                <XAxis type="number" tick={{ fill: "hsl(215, 12%, 55%)", fontSize: 12 }} axisLine={false} />
+                <YAxis type="category" dataKey="category" tick={{ fill: "hsl(215, 12%, 55%)", fontSize: 12 }} axisLine={false} width={80} />
+                <Tooltip {...chartTooltipStyle} />
+                <Bar dataKey="critical" fill="hsl(0, 72%, 51%)" stackId="a" radius={0} />
+                <Bar dataKey="high" fill="hsl(38, 92%, 50%)" stackId="a" radius={0} />
+                <Bar dataKey="medium" fill="hsl(190, 90%, 50%)" stackId="a" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
       </div>
 
       <Card className="bg-card border-border">
