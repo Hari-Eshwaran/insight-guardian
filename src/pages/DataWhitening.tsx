@@ -1,19 +1,20 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { whiteningExamples } from "@/data/mockData";
-import { ShieldCheck, ArrowRight, Info } from "lucide-react";
+import { whiteningExamples } from "@/data/auditData";
+import { ArrowRight, Info } from "lucide-react";
 import { useState } from "react";
 
 export default function DataWhitening() {
   const [ipMasking, setIpMasking] = useState(true);
   const [hostMasking, setHostMasking] = useState(true);
   const [clientRemoval, setClientRemoval] = useState(true);
+  const [certMasking, setCertMasking] = useState(true);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Data Whitening & Sanitization</h1>
-        <p className="text-muted-foreground text-sm mt-1">Remove sensitive identifiers before AI processing</p>
+        <p className="text-muted-foreground text-sm mt-1">Remove sensitive identifiers from scan data before AI processing</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -43,16 +44,32 @@ export default function DataWhitening() {
         <CardHeader><CardTitle className="text-lg">Masking Controls</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm">IP Address Masking</span>
+            <div>
+              <span className="text-sm">IP Address Masking</span>
+              <p className="text-xs text-muted-foreground">Replace all 10.x.x.x addresses with HOST_* tokens</p>
+            </div>
             <Switch checked={ipMasking} onCheckedChange={setIpMasking} />
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm">Hostname Masking</span>
+            <div>
+              <span className="text-sm">Domain / Hostname Masking</span>
+              <p className="text-xs text-muted-foreground">Replace org-domain*.com and FQDNs with DOMAIN_* tokens</p>
+            </div>
             <Switch checked={hostMasking} onCheckedChange={setHostMasking} />
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm">Client Identifier Removal</span>
+            <div>
+              <span className="text-sm">Client / Organization Removal</span>
+              <p className="text-xs text-muted-foreground">Strip registrar, org names, and contact details</p>
+            </div>
             <Switch checked={clientRemoval} onCheckedChange={setClientRemoval} />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm">Certificate & Device Identity Masking</span>
+              <p className="text-xs text-muted-foreground">Replace SSL cert CNs and device serial numbers</p>
+            </div>
+            <Switch checked={certMasking} onCheckedChange={setCertMasking} />
           </div>
         </CardContent>
       </Card>
@@ -63,7 +80,7 @@ export default function DataWhitening() {
           <div>
             <p className="font-medium text-sm">Why Data Whitening is Required</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Data whitening removes all personally identifiable information (PII), client-specific details, and internal network identifiers before data is processed by local AI models. This ensures data privacy compliance, prevents information leakage, and allows the AI to focus on vulnerability patterns rather than specific organizational context.
+              Data whitening removes all personally identifiable information (PII), client-specific details, and internal network identifiers before data is processed by local AI models. This ensures data privacy compliance, prevents information leakage, and allows the AI to focus on vulnerability patterns rather than specific organizational context. For this engagement, 37 host IPs, domain names, SSL certificate identities, and registrar details are sanitized.
             </p>
           </div>
         </CardContent>

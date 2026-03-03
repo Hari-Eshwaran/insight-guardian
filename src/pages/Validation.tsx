@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { validationChecklist } from "@/data/mockData";
+import { validationChecklist } from "@/data/auditData";
 import { CheckCircle, XCircle, ShieldCheck, Info } from "lucide-react";
 
 export default function Validation() {
@@ -10,7 +10,7 @@ export default function Validation() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Validation & Accuracy</h1>
-        <p className="text-muted-foreground text-sm mt-1">Verify AI outputs against parsed evidence</p>
+        <p className="text-muted-foreground text-sm mt-1">Verify AI outputs against parsed scan evidence</p>
       </div>
 
       <Card className="bg-card border-border">
@@ -38,7 +38,7 @@ export default function Validation() {
           <div>
             <p className="font-medium text-sm">Evidence-Based AI Outputs</p>
             <p className="text-sm text-muted-foreground mt-1">
-              All AI-generated outputs are restricted to parsed evidence only. The validation layer cross-references every finding, severity rating, and remediation suggestion against the original scan data to prevent hallucinations and ensure accuracy.
+              All AI-generated outputs are restricted to parsed evidence only. The validation layer cross-references every finding, severity rating, and remediation suggestion against the original Nmap, Nikto, and Metasploit scan data to prevent hallucinations and ensure accuracy. Currently awaiting completion of AI analysis pass to validate executive summary and business impact assessment.
             </p>
           </div>
         </CardContent>

@@ -1,13 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { vulnerabilities } from "@/data/mockData";
-import { CheckCircle, Loader2, Clock } from "lucide-react";
+import { vulnerabilities } from "@/data/auditData";
+import { CheckCircle, Loader2, Clock, Filter } from "lucide-react";
 
 const pipelineSteps = [
   { name: "File Extraction", status: "completed" },
-  { name: "XML / JSON Parsing", status: "completed" },
-  { name: "Risk Filtering", status: "processing" },
+  { name: "CSV / TXT Parsing", status: "completed" },
+  { name: "Risk Classification", status: "completed" },
+  { name: "Evidence Correlation", status: "processing" },
 ];
 
 const stepIcon = (status: string) => {
@@ -16,12 +17,22 @@ const stepIcon = (status: string) => {
   return <Clock className="h-5 w-5 text-muted-foreground" />;
 };
 
+const severityBadge = (severity: string) => {
+  const styles: Record<string, string> = {
+    Critical: "bg-destructive/15 text-destructive border-destructive/30",
+    High: "bg-warning/15 text-warning border-warning/30",
+    Medium: "bg-sky-500/15 text-sky-400 border-sky-500/30",
+    Low: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  };
+  return styles[severity] || "bg-muted text-muted-foreground";
+};
+
 export default function ParsingETL() {
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Parsing & ETL</h1>
-        <p className="text-muted-foreground text-sm mt-1">Extract, transform, and filter vulnerability data</p>
+        <p className="text-muted-foreground text-sm mt-1">Extract, transform, and classify vulnerability data from scan evidence</p>
       </div>
 
       <Card className="bg-card border-border">
@@ -42,28 +53,40 @@ export default function ParsingETL() {
       </Card>
 
       <Card className="bg-card border-border">
-        <CardHeader><CardTitle className="text-lg">Parsed Vulnerabilities</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Filter className="h-5 w-5 text-primary" />
+            Parsed Vulnerabilities — {vulnerabilities.length} findings
+          </CardTitle>
+        </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>ID</TableHead>
                 <TableHead>Vulnerability</TableHead>
-                <TableHead>CVE</TableHead>
+                <TableHead>Host</TableHead>
+                <TableHead>Port</TableHead>
+                <TableHead>Category</TableHead>
                 <TableHead>Severity</TableHead>
-                <TableHead>Source File</TableHead>
+                <TableHead>Evidence</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {vulnerabilities.map((v) => (
-                <TableRow key={v.cve}>
-                  <TableCell className="font-medium">{v.name}</TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">{v.cve}</TableCell>
-                  <TableCell>
-                    <Badge className={v.severity === "Critical" ? "bg-destructive/15 text-destructive border-destructive/30" : "bg-warning/15 text-warning border-warning/30"}>
-                      {v.severity}
-                    </Badge>
+                <TableRow key={v.id}>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{v.id}</TableCell>
+                  <TableCell className="font-medium max-w-xs">
+                    <div>{v.name}</div>
+                    {v.cve && <span className="text-xs text-muted-foreground font-mono">{v.cve}</span>}
                   </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">{v.source}</TableCell>
+                  <TableCell className="font-mono text-xs">{v.host}</TableCell>
+                  <TableCell className="text-muted-foreground">{v.port > 0 ? v.port : "—"}</TableCell>
+                  <TableCell className="text-xs">{v.category}</TableCell>
+                  <TableCell>
+                    <Badge className={severityBadge(v.severity)}>{v.severity}</Badge>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground max-w-[200px] truncate">{v.evidence}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { alerts, recommendations } from "@/data/mockData";
+import { alerts, recommendations } from "@/data/auditData";
 import { AlertTriangle, ShieldAlert, Lightbulb } from "lucide-react";
 
 const severityStyles = {
@@ -18,7 +18,7 @@ export default function Alerts() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Alerts & Recommendations</h1>
-        <p className="text-muted-foreground text-sm mt-1">Critical findings and remediation guidance</p>
+        <p className="text-muted-foreground text-sm mt-1">Critical findings and prioritized remediation guidance from PTE Sep-2025</p>
       </div>
 
       <div className="space-y-3">
@@ -51,7 +51,11 @@ export default function Alerts() {
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <p className="font-medium text-sm">{rec.title}</p>
-                  <Badge variant="outline" className={rec.priority === "Immediate" ? "border-destructive/40 text-destructive" : "border-warning/40 text-warning"}>
+                  <Badge variant="outline" className={
+                    rec.priority === "Immediate" ? "border-destructive/40 text-destructive" :
+                    rec.priority === "Short-term" ? "border-warning/40 text-warning" :
+                    "border-primary/40 text-primary"
+                  }>
                     {rec.priority}
                   </Badge>
                 </div>

@@ -3,21 +3,31 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { reports, vulnerabilities, severityDistribution, categoryBreakdown } from "@/data/mockData";
+import { reports, vulnerabilities, severityDistribution, categoryBreakdown, dashboardStats } from "@/data/auditData";
 import { Download, Eye, FileText } from "lucide-react";
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 const chartTooltipStyle = {
   contentStyle: { backgroundColor: "hsl(220, 18%, 12%)", border: "1px solid hsl(220, 14%, 20%)", borderRadius: "8px", fontSize: "12px", color: "hsl(210, 20%, 90%)" },
   itemStyle: { color: "hsl(210, 20%, 90%)" },
 };
 
+const severityBadge = (severity: string) => {
+  const styles: Record<string, string> = {
+    Critical: "bg-destructive/15 text-destructive border-destructive/30",
+    High: "bg-warning/15 text-warning border-warning/30",
+    Medium: "bg-sky-500/15 text-sky-400 border-sky-500/30",
+    Low: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  };
+  return styles[severity] || "bg-muted text-muted-foreground";
+};
+
 export default function Reports() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Reports & Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-1">Generated audit reports and detailed findings</p>
+        <h1 className="text-2xl font-bold tracking-tight">Reports & Findings</h1>
+        <p className="text-muted-foreground text-sm mt-1">Generated audit reports and detailed vulnerability analysis</p>
       </div>
 
       {/* Report Charts */}
@@ -39,17 +49,18 @@ export default function Reports() {
         </Card>
 
         <Card className="bg-card border-border">
-          <CardHeader><CardTitle className="text-base">Risk Scores by Category</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Risk by Category</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={categoryBreakdown} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 14%, 20%)" horizontal={false} />
                 <XAxis type="number" tick={{ fill: "hsl(215, 12%, 55%)", fontSize: 12 }} axisLine={false} />
-                <YAxis type="category" dataKey="category" tick={{ fill: "hsl(215, 12%, 55%)", fontSize: 12 }} axisLine={false} width={80} />
+                <YAxis type="category" dataKey="category" tick={{ fill: "hsl(215, 12%, 55%)", fontSize: 12 }} axisLine={false} width={100} />
                 <Tooltip {...chartTooltipStyle} />
-                <Bar dataKey="critical" fill="hsl(0, 72%, 51%)" stackId="a" radius={0} />
-                <Bar dataKey="high" fill="hsl(38, 92%, 50%)" stackId="a" radius={0} />
-                <Bar dataKey="medium" fill="hsl(190, 90%, 50%)" stackId="a" radius={[0, 4, 4, 0]} />
+                <Legend wrapperStyle={{ fontSize: "11px" }} />
+                <Bar dataKey="critical" name="Critical" fill="hsl(0, 72%, 51%)" stackId="a" radius={0} />
+                <Bar dataKey="high" name="High" fill="hsl(38, 92%, 50%)" stackId="a" radius={0} />
+                <Bar dataKey="medium" name="Medium" fill="hsl(190, 90%, 50%)" stackId="a" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -102,8 +113,8 @@ export default function Reports() {
             </TabsList>
             <TabsContent value="summary" className="mt-4">
               <div className="bg-muted/50 rounded-md p-4 text-sm text-muted-foreground leading-relaxed space-y-3">
-                <p>The Q4 2024 security audit identified <strong className="text-foreground">8 critical</strong> and <strong className="text-foreground">23 high-severity</strong> vulnerabilities across the assessed infrastructure. The most pressing concerns involve SQL injection and remote code execution vulnerabilities in production-facing systems.</p>
-                <p>Immediate remediation is recommended for all critical findings. A phased remediation plan has been provided with estimated timelines and resource requirements.</p>
+                <p>The PTE Sep-2025 assessment of <strong className="text-foreground">{dashboardStats.totalHosts} hosts</strong> across Azure and on-premises environments identified <strong className="text-foreground">{dashboardStats.criticalCount} critical</strong> and <strong className="text-foreground">{dashboardStats.highCount} high-severity</strong> vulnerabilities. The most pressing concerns involve SQL injection on production web servers, unauthenticated JBoss JMX consoles, and severely outdated FTP servers (FileZilla 0.9.60 beta).</p>
+                <p>Three hosts running end-of-life Windows Server 2008 present ongoing zero-day exposure. All 12 web-facing servers lack essential security headers. Immediate remediation is recommended for all critical findings, with a phased approach for high and medium-severity items.</p>
               </div>
             </TabsContent>
             <TabsContent value="scoring" className="mt-4">
@@ -113,26 +124,33 @@ export default function Reports() {
                     <TableHead>Category</TableHead>
                     <TableHead>Critical</TableHead>
                     <TableHead>High</TableHead>
-                    <TableHead>Score</TableHead>
+                    <TableHead>Medium</TableHead>
+                    <TableHead>Findings</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow><TableCell>Authentication</TableCell><TableCell className="text-destructive">2</TableCell><TableCell className="text-warning">5</TableCell><TableCell>2.1/10</TableCell></TableRow>
-                  <TableRow><TableCell>Input Validation</TableCell><TableCell className="text-destructive">3</TableCell><TableCell className="text-warning">8</TableCell><TableCell>1.8/10</TableCell></TableRow>
-                  <TableRow><TableCell>Access Control</TableCell><TableCell className="text-destructive">2</TableCell><TableCell className="text-warning">6</TableCell><TableCell>3.2/10</TableCell></TableRow>
-                  <TableRow><TableCell>Configuration</TableCell><TableCell className="text-destructive">1</TableCell><TableCell className="text-warning">4</TableCell><TableCell>4.5/10</TableCell></TableRow>
+                  {categoryBreakdown.map((c) => (
+                    <TableRow key={c.category}>
+                      <TableCell className="font-medium">{c.category}</TableCell>
+                      <TableCell className="text-destructive">{c.critical || "—"}</TableCell>
+                      <TableCell className="text-warning">{c.high || "—"}</TableCell>
+                      <TableCell className="text-sky-400">{c.medium || "—"}</TableCell>
+                      <TableCell>{c.critical + c.high + c.medium + c.low}</TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </TabsContent>
             <TabsContent value="findings" className="mt-4">
               <Table>
-                <TableHeader><TableRow><TableHead>Vulnerability</TableHead><TableHead>Severity</TableHead><TableHead>CVE</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Vulnerability</TableHead><TableHead>Host</TableHead><TableHead>Severity</TableHead><TableHead>CVE / CWE</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {vulnerabilities.slice(0, 5).map((v) => (
-                    <TableRow key={v.cve}>
-                      <TableCell>{v.name}</TableCell>
-                      <TableCell><Badge className={v.severity === "Critical" ? "bg-destructive/15 text-destructive border-destructive/30" : "bg-warning/15 text-warning border-warning/30"}>{v.severity}</Badge></TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{v.cve}</TableCell>
+                  {vulnerabilities.filter((v) => v.severity === "Critical" || v.severity === "High").slice(0, 10).map((v) => (
+                    <TableRow key={v.id}>
+                      <TableCell className="font-medium">{v.name}</TableCell>
+                      <TableCell className="font-mono text-xs">{v.host}</TableCell>
+                      <TableCell><Badge className={severityBadge(v.severity)}>{v.severity}</Badge></TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{v.cve || "—"}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
