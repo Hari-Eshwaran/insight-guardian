@@ -137,3 +137,37 @@ export const recommendations = [
     priority: "Short-term",
   },
 ];
+
+export const severityDistribution = [
+  { name: "Critical", value: 8, fill: "hsl(0, 72%, 51%)" },
+  { name: "High", value: 23, fill: "hsl(38, 92%, 50%)" },
+  { name: "Medium", value: 34, fill: "hsl(190, 90%, 50%)" },
+  { name: "Low", value: 15, fill: "hsl(152, 69%, 41%)" },
+];
+
+export const categoryBreakdown = [
+  { category: "Auth", critical: 2, high: 5, medium: 8 },
+  { category: "Input Val.", critical: 3, high: 8, medium: 12 },
+  { category: "Access Ctrl", critical: 2, high: 6, medium: 7 },
+  { category: "Config", critical: 1, high: 4, medium: 7 },
+];
+
+export const timelineData = [
+  { date: "Dec 1", critical: 0, high: 2, medium: 5 },
+  { date: "Dec 3", critical: 1, high: 4, medium: 8 },
+  { date: "Dec 5", critical: 2, high: 7, medium: 12 },
+  { date: "Dec 7", critical: 3, high: 10, medium: 18 },
+  { date: "Dec 9", critical: 5, high: 15, medium: 24 },
+  { date: "Dec 11", critical: 6, high: 19, medium: 29 },
+  { date: "Dec 13", critical: 7, high: 21, medium: 32 },
+  { date: "Dec 15", critical: 8, high: 23, medium: 34 },
+];
+
+export const heatmapData = [
+  { hour: "00", mon: 0, tue: 1, wed: 0, thu: 2, fri: 0, sat: 0, sun: 0 },
+  { hour: "04", mon: 0, tue: 0, wed: 1, thu: 0, fri: 1, sat: 0, sun: 0 },
+  { hour: "08", mon: 3, tue: 2, wed: 4, thu: 3, fri: 5, sat: 1, sun: 0 },
+  { hour: "12", mon: 5, tue: 4, wed: 6, thu: 7, fri: 4, sat: 2, sun: 1 },
+  { hour: "16", mon: 4, tue: 6, wed: 3, thu: 5, fri: 3, sat: 1, sun: 0 },
+  { hour: "20", mon: 2, tue: 1, wed: 2, thu: 1, fri: 2, sat: 0, sun: 0 },
+];
